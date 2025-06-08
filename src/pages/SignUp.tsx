@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +9,9 @@ import { Heart, Upload, User, Stethoscope } from "lucide-react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { Avatar, AvatarImage, AvatarFallback } from "@nextui-org/react";
+import { Loader2 } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
 
 const SignUp = () => {
   const [searchParams] = useSearchParams();
@@ -19,6 +21,7 @@ const SignUp = () => {
   );
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [formData, setFormData] = useState({
     // Common fields
     firstName: '',
@@ -46,6 +49,14 @@ const SignUp = () => {
   });
 
   const { toast } = useToast();
+  const { user } = useAuth();
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user) {
+      navigate('/');
+    }
+  }, [user, navigate]);
 
   const specializations = [
     'Cardiology', 'Dermatology', 'Pediatrics', 'Orthopedics', 
@@ -57,8 +68,55 @@ const SignUp = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleFileChange = (field: string, file: File | null) => {
-    setFormData(prev => ({ ...prev, [field]: file }));
+  const handleFileChange = async (field: string, file: File | null) => {
+    if (!file) {
+      setFormData(prev => ({ ...prev, [field]: file }));
+      return;
+    }
+
+    // Upload image immediately when selected
+    if (field === 'profilePicture') {
+      setUploadingImage(true);
+      try {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Math.random()}.${fileExt}`;
+        const filePath = `profile-pictures/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('avatars')
+          .upload(filePath, file);
+
+        if (uploadError) {
+          throw uploadError;
+        }
+
+        const { data } = supabase.storage
+          .from('avatars')
+          .getPublicUrl(filePath);
+
+        setFormData(prev => ({ 
+          ...prev, 
+          profilePictureUrl: data.publicUrl,
+          [field]: file 
+        }));
+
+        toast({
+          title: "Image uploaded",
+          description: "Profile picture uploaded successfully!",
+        });
+      } catch (error: any) {
+        console.error('Error uploading image:', error);
+        toast({
+          title: "Upload failed",
+          description: "Failed to upload profile picture. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setUploadingImage(false);
+      }
+    } else {
+      setFormData(prev => ({ ...prev, [field]: file }));
+    }
   };
 
   const validateStep = (step: number) => {
@@ -126,6 +184,7 @@ const SignUp = () => {
             last_name: formData.lastName,
             phone: formData.phone,
             user_type: userType,
+            profile_picture_url: formData.profilePictureUrl || null,
             // Add doctor-specific data if doctor
             ...(userType === 'doctor' && {
               medical_license: formData.medicalLicense,
@@ -169,11 +228,11 @@ const SignUp = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 py-8 animate-fade-in">
       <div className="max-w-2xl mx-auto px-4">
         {/* Header */}
-        <div className="text-center mb-8">
-          <Link to="/" className="inline-flex items-center space-x-2 text-blue-600 hover:text-blue-700 mb-4">
+        <div className="text-center mb-8 animate-scale-in">
+          <Link to="/" className="inline-flex items-center space-x-2 text-blue-600 hover:text-blue-700 mb-4 hover-scale">
             <Heart className="h-6 w-6" />
             <span className="text-xl font-bold">HealthCare+</span>
           </Link>
@@ -182,7 +241,7 @@ const SignUp = () => {
         </div>
 
         {/* User Type Selection */}
-        <Card className="mb-6">
+        <Card className="mb-6 animate-fade-in">
           <CardContent className="p-6">
             <Label className="text-base font-medium mb-4 block">I am a:</Label>
             <RadioGroup
@@ -209,19 +268,19 @@ const SignUp = () => {
         </Card>
 
         {/* Progress Indicator */}
-        <div className="mb-8">
+        <div className="mb-8 animate-fade-in">
           <div className="flex items-center justify-center gap-4">
             {[1, 2, 3].map((step) => (
               <div key={step} className="flex items-center">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all duration-300 ${
                   currentStep >= step 
-                    ? 'bg-blue-600 text-white' 
+                    ? 'bg-blue-600 text-white transform scale-110' 
                     : 'bg-gray-200 text-gray-600'
                 }`}>
                   {step}
                 </div>
                 {step < 3 && (
-                  <div className={`w-16 h-1 mx-2 ${
+                  <div className={`w-16 h-1 mx-2 transition-all duration-500 ${
                     currentStep > step ? 'bg-blue-600' : 'bg-gray-200'
                   }`} />
                 )}
@@ -233,7 +292,7 @@ const SignUp = () => {
           </div>
         </div>
 
-        <Card>
+        <Card className="animate-scale-in">
           <CardHeader>
             <CardTitle>
               {currentStep === 1 && "Basic Information"}
@@ -244,7 +303,48 @@ const SignUp = () => {
           <CardContent className="space-y-6">
             {/* Step 1: Basic Information */}
             {currentStep === 1 && (
-              <>
+              <div className="space-y-6 animate-fade-in">
+                {/* Profile Picture Upload */}
+                <div className="text-center">
+                  <Label className="text-base font-medium mb-4 block">Profile Picture (Optional)</Label>
+                  <div className="flex flex-col items-center space-y-4">
+                    <Avatar className="h-20 w-20">
+                      <AvatarImage src={formData.profilePictureUrl || ''} />
+                      <AvatarFallback>
+                        <Upload className="h-8 w-8 text-gray-400" />
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex items-center space-x-2">
+                      <Input
+                        id="profilePicture"
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleFileChange('profilePicture', e.target.files?.[0] || null)}
+                        className="hidden"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => document.getElementById('profilePicture')?.click()}
+                        disabled={uploadingImage}
+                        className="hover-scale"
+                      >
+                        {uploadingImage ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Uploading...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="h-4 w-4 mr-2" />
+                            Upload Photo
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="firstName">First Name *</Label>
@@ -310,7 +410,7 @@ const SignUp = () => {
                     />
                   </div>
                 </div>
-              </>
+              </div>
             )}
 
             {/* Step 2: Profile Details */}
@@ -466,6 +566,7 @@ const SignUp = () => {
                   variant="outline"
                   onClick={() => setCurrentStep(currentStep - 1)}
                   disabled={loading}
+                  className="hover-scale"
                 >
                   Previous
                 </Button>
@@ -473,16 +574,23 @@ const SignUp = () => {
               
               <div className="ml-auto">
                 {currentStep < 3 ? (
-                  <Button onClick={handleNext} disabled={loading}>
+                  <Button onClick={handleNext} disabled={loading} className="hover-scale">
                     Next
                   </Button>
                 ) : (
                   <Button 
                     onClick={handleSubmit} 
-                    className="bg-green-600 hover:bg-green-700"
+                    className="bg-green-600 hover:bg-green-700 hover-scale"
                     disabled={loading}
                   >
-                    {loading ? 'Creating Account...' : 'Create Account'}
+                    {loading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Creating Account...
+                      </>
+                    ) : (
+                      'Create Account'
+                    )}
                   </Button>
                 )}
               </div>
@@ -490,10 +598,10 @@ const SignUp = () => {
           </CardContent>
         </Card>
 
-        <div className="text-center mt-6">
+        <div className="text-center mt-6 animate-fade-in">
           <p className="text-gray-600">
             Already have an account?{' '}
-            <Link to="/login" className="text-blue-600 hover:text-blue-700 font-medium">
+            <Link to="/login" className="text-blue-600 hover:text-blue-700 font-medium story-link">
               Sign in here
             </Link>
           </p>

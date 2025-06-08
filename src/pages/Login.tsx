@@ -72,7 +72,7 @@ const Login = () => {
           description: `Welcome back! Redirecting to your dashboard...`,
         });
         
-        // Redirect based on user type (we'll implement dashboard routing later)
+        // Navigate to dashboard
         navigate('/');
       }
     } catch (error: any) {
@@ -88,11 +88,11 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center py-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 flex items-center justify-center py-8 animate-fade-in">
       <div className="max-w-md w-full px-4">
         {/* Header */}
-        <div className="text-center mb-8">
-          <Link to="/" className="inline-flex items-center space-x-2 text-blue-600 hover:text-blue-700 mb-6">
+        <div className="text-center mb-8 animate-scale-in">
+          <Link to="/" className="inline-flex items-center space-x-2 text-blue-600 hover:text-blue-700 mb-6 hover-scale">
             <Heart className="h-6 w-6" />
             <span className="text-xl font-bold">HealthCare+</span>
           </Link>
@@ -100,7 +100,7 @@ const Login = () => {
           <p className="text-gray-600">Sign in to your account</p>
         </div>
 
-        <Card className="shadow-lg">
+        <Card className="shadow-lg animate-fade-in">
           <CardHeader>
             <CardTitle>Sign In</CardTitle>
           </CardHeader>
@@ -174,7 +174,7 @@ const Login = () => {
                     Remember me
                   </Label>
                 </div>
-                <Link to="/forgot-password" className="text-sm text-blue-600 hover:text-blue-700">
+                <Link to="/forgot-password" className="text-sm text-blue-600 hover:text-blue-700 story-link">
                   Forgot password?
                 </Link>
               </div>
@@ -182,10 +182,17 @@ const Login = () => {
               {/* Submit Button */}
               <Button 
                 type="submit" 
-                className="w-full bg-blue-600 hover:bg-blue-700"
+                className="w-full bg-blue-600 hover:bg-blue-700 hover-scale"
                 disabled={loading}
               >
-                {loading ? 'Signing In...' : 'Sign In'}
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Signing In...
+                  </>
+                ) : (
+                  'Sign In'
+                )}
               </Button>
             </form>
 
@@ -204,12 +211,12 @@ const Login = () => {
             {/* Sign Up Links */}
             <div className="mt-6 grid grid-cols-2 gap-3">
               <Link to="/signup?type=patient">
-                <Button variant="outline" className="w-full">
+                <Button variant="outline" className="w-full hover-scale">
                   Join as Patient
                 </Button>
               </Link>
               <Link to="/signup?type=doctor">
-                <Button variant="outline" className="w-full">
+                <Button variant="outline" className="w-full hover-scale">
                   Join as Doctor
                 </Button>
               </Link>
@@ -218,12 +225,12 @@ const Login = () => {
         </Card>
 
         {/* Footer */}
-        <div className="mt-8 text-center text-sm text-gray-600">
+        <div className="mt-8 text-center text-sm text-gray-600 animate-fade-in">
           <p>
             By signing in, you agree to our{' '}
-            <Link to="/terms" className="text-blue-600 hover:text-blue-700">Terms of Service</Link>
+            <Link to="/terms" className="text-blue-600 hover:text-blue-700 story-link">Terms of Service</Link>
             {' '}and{' '}
-            <Link to="/privacy" className="text-blue-600 hover:text-blue-700">Privacy Policy</Link>
+            <Link to="/privacy" className="text-blue-600 hover:text-blue-700 story-link">Privacy Policy</Link>
           </p>
         </div>
       </div>
