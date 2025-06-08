@@ -6,12 +6,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Heart, Eye, EyeOff } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { useEffect } from 'react';
 
 const Login = () => {
   const [userType, setUserType] = useState<'patient' | 'doctor'>('patient');
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -19,12 +23,21 @@ const Login = () => {
   });
 
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user) {
+      navigate('/');
+    }
+  }, [user, navigate]);
 
   const handleInputChange = (field: string, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.email || !formData.password) {
@@ -36,18 +49,42 @@ const Login = () => {
       return;
     }
 
-    // This will be replaced with actual Supabase authentication
-    toast({
-      title: "Login Successful!",
-      description: `Welcome back! Redirecting to your ${userType} dashboard...`,
-    });
-    
-    console.log('Login attempt:', { ...formData, userType });
-    
-    // Simulate redirect to dashboard
-    setTimeout(() => {
-      window.location.href = userType === 'patient' ? '/patient-dashboard' : '/doctor-dashboard';
-    }, 1500);
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: formData.email,
+        password: formData.password,
+      });
+
+      if (error) {
+        console.error('Login error:', error);
+        toast({
+          title: "Login Failed",
+          description: error.message,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (data.user) {
+        toast({
+          title: "Login Successful!",
+          description: `Welcome back! Redirecting to your dashboard...`,
+        });
+        
+        // Redirect based on user type (we'll implement dashboard routing later)
+        navigate('/');
+      }
+    } catch (error: any) {
+      console.error('Unexpected error:', error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -146,8 +183,9 @@ const Login = () => {
               <Button 
                 type="submit" 
                 className="w-full bg-blue-600 hover:bg-blue-700"
+                disabled={loading}
               >
-                Sign In
+                {loading ? 'Signing In...' : 'Sign In'}
               </Button>
             </form>
 

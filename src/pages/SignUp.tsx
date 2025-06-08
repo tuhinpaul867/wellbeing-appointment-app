@@ -7,15 +7,18 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Heart, Upload, User, Stethoscope } from "lucide-react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const SignUp = () => {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [userType, setUserType] = useState<'patient' | 'doctor'>(
     (searchParams.get('type') as 'patient' | 'doctor') || 'patient'
   );
   const [currentStep, setCurrentStep] = useState(1);
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     // Common fields
     firstName: '',
@@ -85,6 +88,18 @@ const SignUp = () => {
         return false;
       }
     }
+
+    if (step === 2 && userType === 'doctor') {
+      if (!formData.medicalLicense || !formData.specialization) {
+        toast({
+          title: "Missing Information",
+          description: "Please fill in all required fields for doctor registration.",
+          variant: "destructive"
+        });
+        return false;
+      }
+    }
+
     return true;
   };
 
@@ -94,13 +109,63 @@ const SignUp = () => {
     }
   };
 
-  const handleSubmit = () => {
-    // This will be replaced with actual Supabase integration
-    toast({
-      title: "Account Created!",
-      description: "Please check your email for verification link.",
-    });
-    console.log('Form Data:', formData);
+  const handleSubmit = async () => {
+    if (!validateStep(currentStep)) return;
+
+    setLoading(true);
+    try {
+      const redirectUrl = `${window.location.origin}/email-confirmation`;
+      
+      const { data, error } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          emailRedirectTo: redirectUrl,
+          data: {
+            first_name: formData.firstName,
+            last_name: formData.lastName,
+            phone: formData.phone,
+            user_type: userType,
+            // Add doctor-specific data if doctor
+            ...(userType === 'doctor' && {
+              medical_license: formData.medicalLicense,
+              specialization: formData.specialization,
+              experience_years: formData.experience ? parseInt(formData.experience) : null,
+              qualifications: formData.qualifications,
+              consultation_fee: formData.consultationFee ? parseFloat(formData.consultationFee) : null,
+              bio: formData.bio
+            })
+          }
+        }
+      });
+
+      if (error) {
+        console.error('Signup error:', error);
+        toast({
+          title: "Signup Failed",
+          description: error.message,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (data.user && !data.user.email_confirmed_at) {
+        toast({
+          title: "Check Your Email",
+          description: "We've sent you a confirmation link. Please check your email and click the link to activate your account.",
+        });
+        navigate('/login');
+      }
+    } catch (error: any) {
+      console.error('Unexpected error:', error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -251,20 +316,6 @@ const SignUp = () => {
             {/* Step 2: Profile Details */}
             {currentStep === 2 && (
               <>
-                <div>
-                  <Label htmlFor="profilePicture">Profile Picture</Label>
-                  <div className="mt-2">
-                    <Input
-                      id="profilePicture"
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => handleFileChange('profilePicture', e.target.files?.[0] || null)}
-                      className="cursor-pointer"
-                    />
-                    <p className="text-sm text-gray-500 mt-1">Upload a clear photo for identification</p>
-                  </div>
-                </div>
-
                 {userType === 'patient' && (
                   <>
                     <div className="grid grid-cols-2 gap-4">
@@ -365,18 +416,6 @@ const SignUp = () => {
                         />
                       </div>
                     </div>
-
-                    <div>
-                      <Label htmlFor="licenseDocument">Medical License Document</Label>
-                      <Input
-                        id="licenseDocument"
-                        type="file"
-                        accept=".pdf,.jpg,.jpeg,.png"
-                        onChange={(e) => handleFileChange('licenseDocument', e.target.files?.[0] || null)}
-                        className="cursor-pointer"
-                      />
-                      <p className="text-sm text-gray-500 mt-1">Upload a copy of your medical license</p>
-                    </div>
                   </>
                 )}
               </>
@@ -426,6 +465,7 @@ const SignUp = () => {
                 <Button
                   variant="outline"
                   onClick={() => setCurrentStep(currentStep - 1)}
+                  disabled={loading}
                 >
                   Previous
                 </Button>
@@ -433,12 +473,16 @@ const SignUp = () => {
               
               <div className="ml-auto">
                 {currentStep < 3 ? (
-                  <Button onClick={handleNext}>
+                  <Button onClick={handleNext} disabled={loading}>
                     Next
                   </Button>
                 ) : (
-                  <Button onClick={handleSubmit} className="bg-green-600 hover:bg-green-700">
-                    Create Account
+                  <Button 
+                    onClick={handleSubmit} 
+                    className="bg-green-600 hover:bg-green-700"
+                    disabled={loading}
+                  >
+                    {loading ? 'Creating Account...' : 'Create Account'}
                   </Button>
                 )}
               </div>
